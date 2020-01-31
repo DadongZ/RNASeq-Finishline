@@ -44,6 +44,10 @@ shinyServer(function(input, output, session) {
       selectInput("ref1", "Study group", "Dose20")
     })
     
+    observe({
+      updateSelectInput(session, "species", choices="Human")
+    })
+    
     resdemo <- reactiveVal()
     voldemo <- reactiveVal()
     godemo <- reactiveVal()
@@ -60,7 +64,7 @@ shinyServer(function(input, output, session) {
         incProgress(0.4, detail="Differeital expression ... ")
         
         Sys.sleep(2)
-        godemo(getgores(resdemo()[["results"]], species="Human"))
+        godemo(getgores(resdemo()[["results"]], species=input$species))
         incProgress(0.4, detail="Pahtway analysis ... ")
         
         Sys.sleep(3)
@@ -104,7 +108,9 @@ shinyServer(function(input, output, session) {
              "Molecular function greater"=godemo()[["mfupper"]],
              "Molecular function less"=godemo()[["mfless"]],
              "Cellular component greater"=godemo()[["ccupper"]],
-             "Cellular component less"=godemo()[["ccless"]])
+             "Cellular component less"=godemo()[["ccless"]],
+             "KEGG greater"=godemo()[["kgupper"]],
+             "KEGG component less"=godemo()[["kgless"]])
     })
       output$gores <- renderTable({
       godowndat()
@@ -174,7 +180,7 @@ shinyServer(function(input, output, session) {
           incProgress(0.4, detail="Differeital expression ... ")
           
           Sys.sleep(2)
-          gores(getgores(resobj()[["results"]], species="Human"))
+          gores(getgores(resobj()[["results"]], species=input$species))
           incProgress(0.4, detail="Pahtway analysis ... ")
           
           Sys.sleep(3)
@@ -220,7 +226,9 @@ shinyServer(function(input, output, session) {
                "Molecular function greater"=gores()[["mfupper"]],
                "Molecular function less"=gores()[["mfless"]],
                "Cellular component greater"=gores()[["ccupper"]],
-               "Cellular component less"=gores()[["ccless"]])
+               "Cellular component less"=gores()[["ccless"]],
+               "KEGG greater"=gores()[["kgupper"]],
+               "KEGG less"=gores()[["kgless"]])
       })
       output$gores <- renderTable({
         godowndat()

@@ -67,18 +67,36 @@ getvolcano<-function(dgeres, AdjustedCutoff=0.05, FCCutoff=1){
 
 getgores<-function(dgeres, species="Human"){
   GO<-go.gsets(species = species)
+  KEGG<-kegg.gsets(species = tolower(species), id.type = "kegg")
   brushdat<-dgeres%>%
     mutate(entrez=mapIds(org.Hs.eg.db, dgeres$Gene, 'ENTREZID', 'SYMBOL', multiVals = "first"))
   fcs<-brushdat$log2FoldChange
   names(fcs)<-brushdat$entrez
-  bpres<-gage(fcs, gsets=GO$go.sets[GO$go.subs$BP], ref=NULL, samp = NULL)
-  ccres<-gage(fcs, gsets=GO$go.sets[GO$go.subs$CC], ref=NULL, samp = NULL)
-  mfres<-gage(fcs, gsets=GO$go.sets[GO$go.subs$MF], ref=NULL, samp = NULL)
+  getpathout<-function(set){
+      out<-gage(fcs, gsets=set, ref=NULL, samp = NULL)
+      out_greater<-out[["greater"]]%>%data.frame%>%
+        rownames_to_column(var="Pathway_ID")%>%
+        mutate(Pathway_ID=str_sub(Pathway_ID, 1, 60))%>%
+        dplyr::select(-exp1)
+      out_less<-out[["less"]]%>%data.frame%>%
+        rownames_to_column(var="Pathway_ID")%>%
+        mutate(Pathway_ID=str_sub(Pathway_ID, 1, 60), 
+               set.size=as.integer(set.size))%>%
+        dplyr::select(-exp1)
+    return(list(greater=out_greater, 
+                less=out_less))
+  }
+  bpres<-getpathout(set=GO$go.sets[GO$go.subs$BP])
+  ccres<-getpathout(set=GO$go.sets[GO$go.subs$CC])
+  mfres<-getpathout(set=GO$go.sets[GO$go.subs$MF])
+  kegg<-getpathout(set=KEGG$kg.sets[KEGG$sigmet.idx])
   return(list(bpupper=bpres[['greater']],
               bpless=bpres[['less']],
               ccupper=ccres[['greater']],
               ccless=ccres[['less']],
               mfupper=mfres[['greater']],
-              mfless=mfres[['less']]))
+              mfless=mfres[['less']],
+              kgupper=kegg[['greater']],
+              kgless=kegg[['less']]))
 }
 

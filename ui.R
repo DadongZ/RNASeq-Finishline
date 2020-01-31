@@ -40,7 +40,7 @@ shinyUI(fluidPage(
                            accept = c("text/csv",
                                       "text/comma-separated-values,text/plain",
                                       ".csv")),
-                   #select column name
+                #select column name
                  selectInput("design", "Column name for analysis", " "),
                  
                  #select ref group
@@ -49,6 +49,9 @@ shinyUI(fluidPage(
                  #select study group
                  uiOutput("level1"),
                  
+                #select column name
+                 selectInput("species", "Species", c("Human"="Human", "Mouse"="Mouse")),
+                
                  #action run
                  actionBttn("runbutton", "GO", style="simple", size="sm", color = "primary"),
                  
@@ -104,7 +107,7 @@ shinyUI(fluidPage(
              
     ),
     #tabPanel-Plots
-    tabPanel("Plots", fluid = TRUE,
+    tabPanel("Volcano plot", fluid = TRUE,
              fluidRow(
                column(width = 8,
                       plotOutput("plot1", height = 800,
@@ -122,7 +125,7 @@ shinyUI(fluidPage(
              )
     ),
     #tabPanel-GO Results
-    tabPanel("GO pathway results", fluid = TRUE,
+    tabPanel("Pathways results", fluid = TRUE,
              # App title ----
              titlePanel("Download results"),
              
@@ -139,7 +142,9 @@ shinyUI(fluidPage(
                                          "Molecular function greater",
                                          "Molecular function less",
                                          "Cellular component greater",
-                                         "Cellular component less")),
+                                         "Cellular component less",
+                                         "KEGG greater",
+                                         "KEGG less")),
                  
                  # Button
                  downloadButton("downloadGo", "Download")
@@ -153,7 +158,6 @@ shinyUI(fluidPage(
                  
                )
               )             
-             
     )
   )
 ))
