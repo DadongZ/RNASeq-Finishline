@@ -1,0 +1,10 @@
+name: rnaseq-finishline
+title:
+username:
+account: doubleomics
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1746000
+bundleId: 2768431
+url: https://doubleomics.shinyapps.io/rnaseq-finishline/
+when: 1580578189.29435

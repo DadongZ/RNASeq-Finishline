@@ -2,4 +2,4 @@ options(repos=BiocManager::repositories())
 getOption("repos")
 library(rsconnect)
 
-rsconnect::deployApp("RNASeq-Wrapper.Rmd")
+rsconnect::deployApp("RNASeq-Finishline.Rmd")
