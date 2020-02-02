@@ -1,16 +1,22 @@
+##Sun Feb  2 18:32:34 2020
+##Global
+
 rm(list=ls())
 library(tidyverse)
 library(readxl)
 library(shiny)
+library(shinyjs)
 library(shinyWidgets)
+library(shinyalert)
 library(ggplot2)
 library(DESeq2)
 library(reshape2)
 library(calibrate)
-library(DEFormats)
 library(gage)
+library(DEFormats)
 library(HGNChelper)
 library(org.Hs.eg.db)
+library(org.Mm.eg.db)
 data("hgnc.table")
 options(stringsAsFactors=FALSE)
 
@@ -49,7 +55,7 @@ getdgeres<-function(count, manifest, comparison, level1, level0){
 getvolcano<-function(dgeres, AdjustedCutoff=0.05, FCCutoff=1){
   brushdat<-dgeres%>%
     mutate(Significance=factor(ifelse(log2FoldChange < (-FCCutoff) & padj < AdjustedCutoff, "FC_FDR_Down",
-                               ifelse(log2FoldChange > FCCutoff & padj < AdjustedCutoff, "FC_FDR_Up", "NS"))))
+                                      ifelse(log2FoldChange > FCCutoff & padj < AdjustedCutoff, "FC_FDR_Up", "NS"))))
   
   #plot
   p <-ggplot(brushdat, aes(x=log2FoldChange, y=log10padj)) +
@@ -68,21 +74,32 @@ getvolcano<-function(dgeres, AdjustedCutoff=0.05, FCCutoff=1){
 getgores<-function(dgeres, species="Human"){
   GO<-go.gsets(species = species)
   KEGG<-kegg.gsets(species = tolower(species), id.type = "kegg")
-  brushdat<-dgeres%>%
-    mutate(entrez=mapIds(org.Hs.eg.db, dgeres$Gene, 'ENTREZID', 'SYMBOL', multiVals = "first"))
+  if(species%in%c("Human", "human")){
+    brushdat<-dgeres%>%
+      mutate(entrez=mapIds(org.Hs.eg.db, dgeres$Gene, 'ENTREZID', 'SYMBOL', multiVals = "first"))%>%
+      dplyr::filter(!is.na(entrez))
+  } else if (species%in%c("Mouse", "mouse")){
+    brushdat<-dgeres%>%
+      mutate(entrez=mapIds(org.Mm.eg.db, dgeres$Gene, 'ENTREZID', 'SYMBOL', multiVals = "first"))%>%
+      dplyr::filter(!is.na(entrez))
+  } else {
+    stop("Currently only support Human and Mouse.")
+  }
+  
   fcs<-brushdat$log2FoldChange
   names(fcs)<-brushdat$entrez
   getpathout<-function(set){
-      out<-gage(fcs, gsets=set, ref=NULL, samp = NULL)
-      out_greater<-out[["greater"]]%>%data.frame%>%
-        rownames_to_column(var="Pathway_ID")%>%
-        mutate(Pathway_ID=str_sub(Pathway_ID, 1, 60))%>%
-        dplyr::select(-exp1)
-      out_less<-out[["less"]]%>%data.frame%>%
-        rownames_to_column(var="Pathway_ID")%>%
-        mutate(Pathway_ID=str_sub(Pathway_ID, 1, 60), 
-               set.size=as.integer(set.size))%>%
-        dplyr::select(-exp1)
+    out<-gage(fcs, gsets=set, ref=NULL, samp = NULL)
+    out_greater<-out[["greater"]]%>%data.frame%>%
+      rownames_to_column(var="Pathway_ID")%>%
+      mutate(Pathway_ID=str_sub(Pathway_ID, 1, 60),
+             set.size=as.integer(set.size))%>%
+      dplyr::select(-exp1)
+    out_less<-out[["less"]]%>%data.frame%>%
+      rownames_to_column(var="Pathway_ID")%>%
+      mutate(Pathway_ID=str_sub(Pathway_ID, 1, 60), 
+             set.size=as.integer(set.size))%>%
+      dplyr::select(-exp1)
     return(list(greater=out_greater, 
                 less=out_less))
   }
@@ -99,4 +116,3 @@ getgores<-function(dgeres, species="Human"){
               kgupper=kegg[['greater']],
               kgless=kegg[['less']]))
 }
-

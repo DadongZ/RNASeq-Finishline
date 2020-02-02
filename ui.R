@@ -7,12 +7,23 @@
 #    http://shiny.rstudio.com/
 #
 
-library(shiny)
-
-shinyUI(fluidPage(
-  tags$head(tags$style(".shiny-progress {color: green; font-size: 20px; font-style: italic;}")),
+jsResetCode <- "shinyjs.reset = function() {history.go(0)}"
+shinyUI(
+   fluidPage(
+  #set backgroud color
+  setBackgroundColor(
+    color = c("#F7FBFF", "#2171B5"),
+    gradient = "radial",
+    direction = c("top", "left")
+  ),
+  
+  #reset session by reset button
+  useShinyjs(),                                           # Include shinyjs in the UI
+  extendShinyjs(text = jsResetCode, functions="shinyjs.reset"), 
+  
+  #panels
   tabsetPanel(
-    #tabPanel-Input
+    ##tabPanel-Input
     tabPanel("Input", fluid = TRUE,
              
              # tab title ----
@@ -23,24 +34,24 @@ shinyUI(fluidPage(
                
                # sidebar panel for inputs ----
                sidebarPanel(
-                 
                  #show ct demo
                  actionBttn("runexample", "Import demo data", style="simple", size="sm", color = "primary"),
                  
                  # input1: Select a file ----
                  fileInput("file1", "Count matrix File (.xlsx)",
-                           multiple = TRUE,
+                           multiple = FALSE,
                            accept = c("text/csv",
                                       "text/comma-separated-values,text/plain",
                                       ".csv")),
-
+                 
                  #input2: select a file ----
                  fileInput("file2", "Manifest File (.xlsx)",
-                           multiple = TRUE,
+                           multiple = FALSE,
                            accept = c("text/csv",
                                       "text/comma-separated-values,text/plain",
                                       ".csv")),
-                #select column name
+                 
+                 #select column name
                  selectInput("design", "Column name for analysis", " "),
                  
                  #select ref group
@@ -49,27 +60,40 @@ shinyUI(fluidPage(
                  #select study group
                  uiOutput("level1"),
                  
-                #select column name
+                 #select column name
                  selectInput("species", "Species", c("Human"="Human", "Mouse"="Mouse")),
-                
+                 
                  #action run
                  actionBttn("runbutton", "GO", style="simple", size="sm", color = "primary"),
                  
                  actionBttn("reset", "RESET", style="simple", size="sm", color = "warning"),
+                 
                  #comment message
-                 p("Click GO to perform differential gene expression analysis between the selected groups"),
+                 helpText("For demonstration, click `Import demo data` and `GO`"),
+                 helpText("Click `RESET` to upload your data and `GO` to launch analyses"),
                  
                  #README link
-                 uiOutput("README"),
+                 h6("Need support in generating count matrix?"),
+                 a(actionBttn(inputId = "email1", 
+                              label = "Contact developer", 
+                              icon = icon("envelope", lib = "font-awesome"),
+                              size="xs",
+                              color="success"),
+                   href="mailto:doubleomics@gmail.com"),
                  
-                 #issue report
-                 uiOutput("issue")
+                 a(actionBttn(inputId = "twitter_share",
+                              label = "Follow us",
+                              icon = icon("twitter", lib = "font-awesome"),
+                              size="xs",
+                              color="success"),
+                   href = "https://twitter.com/DoubleOmics")
                  
                ),
                # Main panel for displaying outputs ----
                mainPanel(
-                 
                  # Output: Data file ----
+                 span(textOutput("ngene"),style="color:blue"),
+                 span(textOutput("nsample"),style="color:blue"),
                  tableOutput("matrix"),
                  tableOutput("pdat")
                )
@@ -80,32 +104,24 @@ shinyUI(fluidPage(
     tabPanel("DGE results", fluid = TRUE,
              # App title ----
              titlePanel("Download results"),
-             
              # Sidebar layout with input and output definitions ----
              sidebarLayout(
-               
                # Sidebar panel for inputs ----
                sidebarPanel(
-                 
                  # Input: Choose dataset ----
                  selectInput("results", "Choose a dataset:",
                              choices = c("Results", "Normalized matrix")),
-                 
                  # Button
                  downloadButton("downloadData", "Download")
                  
                ),
-               
                # Main panel for displaying outputs ----
                mainPanel(
-                 
                  tableOutput("table")
-                 
                )
-               
-             )             
-             
+             )
     ),
+    
     #tabPanel-Plots
     tabPanel("Volcano plot", fluid = TRUE,
              fluidRow(
@@ -124,17 +140,15 @@ shinyUI(fluidPage(
                )
              )
     ),
+    
     #tabPanel-GO Results
     tabPanel("Pathways results", fluid = TRUE,
              # App title ----
              titlePanel("Download results"),
-             
              # Sidebar layout with input and output definitions ----
              sidebarLayout(
-               
                # Sidebar panel for inputs ----
                sidebarPanel(
-                 
                  # Input: Choose dataset ----
                  selectInput("gopathway", "Choose a dataset:",
                              choices = c("Biological process greater",
@@ -145,19 +159,14 @@ shinyUI(fluidPage(
                                          "Cellular component less",
                                          "KEGG greater",
                                          "KEGG less")),
-                 
                  # Button
                  downloadButton("downloadGo", "Download")
-                 
                ),
-               
                # Main panel for displaying outputs ----
                mainPanel(
-                 
                  tableOutput("gores")
-                 
                )
-              )             
+             )             
     )
   )
-))
+)
