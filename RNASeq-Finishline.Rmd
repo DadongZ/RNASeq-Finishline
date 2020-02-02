@@ -16,15 +16,16 @@ library(readxl)
 library(shiny)
 library(shinyjs)
 library(shinyWidgets)
+library(shinyalert)
 library(ggplot2)
 library(DESeq2)
 library(reshape2)
 library(calibrate)
-library(DEFormats)
 library(gage)
+library(DEFormats)
 library(HGNChelper)
 library(org.Hs.eg.db)
-
+library(org.Mm.eg.db)
 data("hgnc.table")
 options(stringsAsFactors=FALSE)
 ```
@@ -95,7 +96,7 @@ getgores<-function(dgeres, species="Human"){
   } else {
     stop("Currently only support Human and Mouse.")
   }
-
+  
   fcs<-brushdat$log2FoldChange
   names(fcs)<-brushdat$entrez
   getpathout<-function(set){
@@ -128,7 +129,6 @@ getgores<-function(dgeres, species="Human"){
 }
 ```
 
-
 ```{r ui,  echo=FALSE, comments="", warning=FALSE, message=FALSE}
 
 jsResetCode <- "shinyjs.reset = function() {history.go(0)}"
@@ -143,7 +143,7 @@ ui <- fluidPage(
   
   #reset session by reset button
   useShinyjs(),                                           # Include shinyjs in the UI
-  extendShinyjs(text = jsResetCode), 
+  extendShinyjs(text = jsResetCode, functions="shinyjs.reset"), 
   
   #panels
   tabsetPanel(
@@ -163,14 +163,14 @@ ui <- fluidPage(
                  
                  # input1: Select a file ----
                  fileInput("file1", "Count matrix File (.xlsx)",
-                           multiple = TRUE,
+                           multiple = FALSE,
                            accept = c("text/csv",
                                       "text/comma-separated-values,text/plain",
                                       ".csv")),
                  
                  #input2: select a file ----
                  fileInput("file2", "Manifest File (.xlsx)",
-                           multiple = TRUE,
+                           multiple = FALSE,
                            accept = c("text/csv",
                                       "text/comma-separated-values,text/plain",
                                       ".csv")),
@@ -211,7 +211,7 @@ ui <- fluidPage(
                               size="xs",
                               color="success"),
                    href = "https://twitter.com/DoubleOmics")
-                   
+                 
                ),
                # Main panel for displaying outputs ----
                mainPanel(
@@ -299,31 +299,35 @@ ui <- fluidPage(
 ```{r sever,  echo=FALSE, comments="", warning=FALSE, message=FALSE}
 server <- function(input, output, session) {
   #tabPanel-Input
-  ###demo data
-  ####count
-  set.seed(123456)
-  n=10000; m=9
-  ctdemo<- simulateRnaSeqData(output="matrix", n=n, m=m)%>%data.frame%>%
-    mutate(Gene=sample(unique(hgnc.table$Approved.Symbol), n))%>%
-    dplyr::select(Gene, everything(.))
-  ####manifest
-  pdemo<-data.frame(ID=paste0("sample", 1:m), 
-                    Treatment=rep(c("Dose10", "Control", "Dose20"), each=3), 
-                    Gender=sample(c("F", "M"), m, T))
-  
   ###display demo count matrix
+  ctobj <- isolate(reactiveVal())
+  pobj <- isolate(reactiveVal())
+  
   observeEvent(input$runexample, {
+    ctobj <- (NULL)
+    pobj <- (NULL)
+    
+    set.seed(123456)
+    n=2000; m=9
+    ctobj(simulateRnaSeqData(output="matrix", n=n, m=m)%>%data.frame%>%
+            mutate(Gene=sample(unique(hgnc.table$Approved.Symbol), n))%>%
+            dplyr::select(Gene, everything(.)))
+    
+    pobj(data.frame(ID=paste0("sample", 1:m), 
+                    Treatment=rep(c("Dose10", "Control", "Dose20"), each=3), 
+                    Gender=sample(c("F", "M"), m, T)))
+    
     #ngenes
-    output$ngene <- renderText({paste("Number of genes: ", dim(ctdemo)[1], " [First 10 rows displayed]")})
+    output$ngene <- renderText({paste("Number of genes: ", dim(ctobj())[1], " [First 10 rows displayed]")})
     #nsamples
-    output$nsample <- renderText({paste("Number of genes: ", (dim(ctdemo)[2])-1, " [First 10 rows displayed]")})
+    output$nsample <- renderText({paste("Number of samples: ", (dim(ctobj())[2])-1, " [First 10 rows displayed]")})
     #display 10rows count matrix
     output$matrix <- renderTable({
-      head(ctdemo, 10)
+      head(ctobj(), 10)
     })
     #display10rows manifest
     output$pdat <- renderTable({
-      head(pdemo, 10)
+      head(pobj(), 10)
     })
     #model variables
     ##comparison variable
@@ -342,137 +346,49 @@ server <- function(input, output, session) {
     observe({
       updateSelectInput(session, "species", choices="Human")
     })
-    #Analysis of demo
-    ##main analysis
-    resdemo <- reactiveVal()
-    voldemo <- reactiveVal()
-    godemo <- reactiveVal()
-    observeEvent(input$runbutton, {
-      resdemo <- (NULL)
-      voldemo <- (NULL)
-      godemo <- (NULL)
-      withProgress(message = 'Running...', value=0, style = "old", {
-        Sys.sleep(1)
-        resdemo(getdgeres(ctdemo, pdemo,
-                          comparison=input$design, 
-                          level1=input$ref1,
-                          level0=input$ref0))
-        incProgress(0.4, detail="Differeital expression ... ")
-        
-        Sys.sleep(2)
-        godemo(getgores(resdemo()[["results"]], species=input$species))
-        incProgress(0.4, detail="Pahtway analysis ... ")
-        
-        Sys.sleep(3)
-        voldemo(getvolcano(resdemo()[["results"]]))
-        incProgress(0.2, detail="making plot ... ")
-      })
-    })
-    
-    ##tabPanel-Results
-    todowndat <- reactive({
-      switch(input$results,
-             "Results" = resdemo()[["results"]],
-             "Normalized matrix" = resdemo()[["normal"]]
-      )
-    })
-    
-    output$table <- renderTable({
-      todowndat()
-    })
-    
-    output$downloadData <- downloadHandler(
-      filename = function() {
-        paste(input$results, ".csv", sep = "")
-      },
-      content = function(file) {
-        write.csv(todowndat(), file, row.names = FALSE)
-      }
-    ) 
-    ##tabPanel-volcano
-    output$plot1 <- renderPlot({
-      voldemo()[["plot"]]
-    })
-    
-    output$brush_info <- renderPrint({
-      showdf<-voldemo()[["brush"]]%>%dplyr::select(Gene, log2FoldChange, pvalue, padj, log10padj) 
-      brushedPoints(showdf, input$plot1_brush)
-    })
-    
-    ##tabPanel-pathway
-    godowndat <- reactive({
-      switch(input$gopathway,
-             "Biological process greater"=godemo()[["bpupper"]],
-             "Biological process less"=godemo()[["bpless"]],
-             "Molecular function greater"=godemo()[["mfupper"]],
-             "Molecular function less"=godemo()[["mfless"]],
-             "Cellular component greater"=godemo()[["ccupper"]],
-             "Cellular component less"=godemo()[["ccless"]],
-             "KEGG greater"=godemo()[["kgupper"]],
-             "KEGG component less"=godemo()[["kgless"]])
-    })
-    output$gores <- renderTable({
-      godowndat()
-    })
-    output$downloadGo <- downloadHandler(
-      filename = function() {
-        paste(input$gopathway, ".csv", sep = "")
-      },
-      content = function(file) {
-        write.csv(todowndat(), file, row.names = FALSE)
-      }
-    ) 
-    
   })
   
-  #RESET for new analysis
-  observeEvent(input$reset, {js$reset()}) 
-
-  #USER'S DATA ANALYSIS
-  ##READ COUNT MATRIX
-  ctobj <- reactive({
-    req(input$file1)
-    count <- read_excel(input$file1$datapath)
-    return(count)
+  observeEvent(input$file1, {
+    ctobj <- (NULL)
+    ctobj(read_excel(input$file1$datapath))
+    
+    ##SHOW SUMMARY
+    output$ngene <- renderText({paste("Number of genes: ", dim(ctobj())[1], ". [First 10 rows displayed]")})
+    
+    output$nsample <- renderText({paste("Number of samples: ", (dim(ctobj())[2])-1, ". [First 10 rows displayed]")})
+    
+    ##DISPLAY 10 ROWS
+    output$matrix <- renderTable({
+      head(ctobj(), 10)
+    })
   })
-  ##READ MANIFEST
-  pobj <- reactive({
-    req(input$file2)
-    pheno <- read_excel(input$file2$datapath)
-    return(pheno)
+  observeEvent(input$file2, {
+    pobj <- (NULL)
+    pobj(read_excel(input$file2$datapath))
+    
+    output$pdat <- renderTable({
+      head(pobj(),  10)
+    })
+    ##MODEL VARIABLES
+    ###COMPARISON VARIALBE
+    observe({
+      updateSelectInput(session, "design", choices=names(pobj()))
+    })
+    ###CONTROL
+    output$level0 <- renderUI({
+      selectInput("ref0", "Reference group", pobj()[[input$design]])
+    })
+    ###TARGET
+    output$level1 <- renderUI({
+      selectInput("ref1", "Study group", pobj()[[input$design]])
+    })
   })
-  ##SHOW SUMMARY
-  output$ngene <- renderText({paste("Number of genes: ", dim(ctobj())[1], ". [First 10 rows displayed]")})
   
-  output$nsample <- renderText({paste("Number of samples: ", (dim(ctobj())[2])-1, ". [First 10 rows displayed]")})
-  
-  ##DISPLAY 10 ROWS
-  output$matrix <- renderTable({
-    head(ctobj(), 10)
-  })
-  
-  output$pdat <- renderTable({
-    head(pobj(),  10)
-  })
-  
-  ##MODEL VARIABLES
-  ###COMPARISON VARIALBE
-  observe({
-    updateSelectInput(session, "design", choices=names(pobj()))
-  })
-  ###CONTROL
-  output$level0 <- renderUI({
-    selectInput("ref0", "Reference group", pobj()[[input$design]])
-  })
-  ###TARGET
-  output$level1 <- renderUI({
-    selectInput("ref1", "Study group", pobj()[[input$design]])
-  })
-
   ##ANALYSIS
   resobj <- reactiveVal()
   volplot <- reactiveVal()
   gores <- reactiveVal()
+  
   observeEvent(input$runbutton, {
     resobj <- (NULL)
     volplot <- (NULL)
@@ -553,6 +469,8 @@ server <- function(input, output, session) {
       write.csv(todowndat(), file, row.names = FALSE)
     }
   ) 
+  #RESET for new analysis
+  observeEvent(input$reset, {js$reset()}) 
   
 }
 ```
@@ -560,7 +478,3 @@ server <- function(input, output, session) {
 ```{r runapp,  echo=FALSE, comments="", warning=FALSE, message=FALSE}
 shinyApp(ui, server, options = list(height = 1100))
 ```
-
-
-
-
