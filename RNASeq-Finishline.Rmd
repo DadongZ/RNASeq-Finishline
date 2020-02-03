@@ -143,7 +143,7 @@ ui <- fluidPage(
   
   #reset session by reset button
   useShinyjs(),                                           # Include shinyjs in the UI
-  extendShinyjs(text = jsResetCode, functions="shinyjs.reset"), 
+  extendShinyjs(text = jsResetCode, functions="reset"), 
   
   #panels
   tabsetPanel(
